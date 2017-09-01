@@ -11,7 +11,11 @@ Microsys.EAI.Framework.PasswordManager.exe -set -send -name:MySendPort -user:Joh
 Parameters:
 
 -list -application:[application name]
+
 -get -receive -name:[receive location name]
+
 -get -send -name:[send port name]
+
 -set -receive -name:[receive location name] -user:[username] -password:[password]
+
 -set -send -name:[send port name] -user:[username] -password:[password]
