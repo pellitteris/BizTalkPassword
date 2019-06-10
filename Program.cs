@@ -1,7 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.IO;
 using System.Xml;
 using Microsoft.BizTalk.ExplorerOM;
 using Microsoft.Win32;
+using Newtonsoft.Json;
+using System.Text;
 
 namespace Microsys.EAI.Framework.PasswordManager
 {
@@ -14,6 +19,8 @@ namespace Microsys.EAI.Framework.PasswordManager
         private static string _portName = string.Empty;
         private static string _userName = string.Empty;
         private static string _password = string.Empty;
+        private static string _filePath = string.Empty;
+        private static string _mappingPath = string.Empty;
 
         static void Main(string[] args)
         {
@@ -41,6 +48,41 @@ namespace Microsys.EAI.Framework.PasswordManager
 
                     break;
 
+                case "-credentials":
+
+                    if (string.IsNullOrEmpty(_applicationName))
+                    {
+                        PrintHelp();
+                        return;
+                    }
+
+                    ListCredentials(_applicationName);
+
+                    break;
+
+                case "-generatescript":
+
+                    if (string.IsNullOrEmpty(_applicationName))
+                    {
+                        PrintHelp();
+                        return;
+                    }
+
+                    GenerateSetCredentialScript(_applicationName, _filePath, _mappingPath);
+
+                    break;
+
+                case "-generatemapping":
+
+                    if (string.IsNullOrEmpty(_applicationName))
+                    {
+                        PrintHelp();
+                        return;
+                    }
+
+                    GenerateCredentialMapping(_applicationName, _filePath);
+
+                    break;
                 case "-get":
 
                     if (string.IsNullOrEmpty(_portType) || string.IsNullOrEmpty(_portName))
@@ -79,6 +121,24 @@ namespace Microsys.EAI.Framework.PasswordManager
 
                     break;
 
+                case "-clear":
+
+                    if (string.IsNullOrEmpty(_portType) || string.IsNullOrEmpty(_portName))
+                    {
+                        PrintHelp();
+                        return;
+                    }
+
+                    if (_portType == "-receive")
+                    {
+                        SetReceiveLocation(_portName, "", "");
+                    }
+                    else
+                    {
+                        SetSendPort(_portName, "", "");
+                    }
+                    break;
+
             }
 
 
@@ -92,7 +152,7 @@ namespace Microsys.EAI.Framework.PasswordManager
 
                 var arg = param.ToLower();
 
-                if (arg == "-list" || arg == "-get" || arg == "-set")
+                if (arg == "-list" || arg == "-credentials" || arg == "-generatescript" || arg == "-generatemapping" || arg == "-get" || arg == "-set" || arg == "-clear")
                 {
                     _commandName = arg;
                 }
@@ -122,19 +182,32 @@ namespace Microsys.EAI.Framework.PasswordManager
                     _password = param.Split(":".ToCharArray())[1];
                 }
 
+                if (arg.StartsWith("-file:"))
+                {
+                    _filePath = param.Split(":".ToCharArray())[1];
+                }
+
+                if (arg.StartsWith("-mapping:"))
+                {
+                    _mappingPath = param.Split(":".ToCharArray())[1];
+                }
             }
 
         }
 
         static void PrintHelp()
         {
-            Console.WriteLine("Missing parameters\r\n");
             Console.WriteLine("Parameters:\r\n");
             Console.WriteLine("-list -application:[application name]\r\n");
-            Console.WriteLine("-get -receive -name:[receive location name]\r\n");
+            Console.WriteLine("-credentials -application:[application name]\r\n");
+            Console.WriteLine("-generatescript -application:[application name] -file:[file name or path] (optional) -mapping:[file name or path] (optional)\r\n");
+            Console.WriteLine("-generatemapping -application:[application name] -file:[file name or path] (optional)\r\n");
+            Console.WriteLine("-get -receive -name:[receive location name]");
             Console.WriteLine("-get -send -name:[send port name]\r\n");
-            Console.WriteLine("-set -receive -name:[receive location name] -user:[username] -password:[password]\r\n");
+            Console.WriteLine("-set -receive -name:[receive location name] -user:[username] -password:[password]");
             Console.WriteLine("-set -send -name:[send port name] -user:[username] -password:[password]\r\n");
+            Console.WriteLine("-clear -receive -name:[receive location name]");
+            Console.WriteLine("-clear -send -name:[receive location name]");
         }
 
         private static string GetConnectionString()
@@ -206,6 +279,280 @@ namespace Microsys.EAI.Framework.PasswordManager
             }
 
 
+        }
+
+        private static void ListCredentials(string applicationName)
+        {
+
+            BtsCatalogExplorer catalog = new BtsCatalogExplorer();
+            catalog.ConnectionString = GetConnectionString();
+
+            Application application = catalog.Applications[applicationName];
+
+            Console.WriteLine();
+            Console.WriteLine(string.Concat("Application: ", application.Name));
+            Console.WriteLine();
+            Console.WriteLine("Direction;Name;Address;UserName");
+
+            foreach (ReceivePort receivePort in application.ReceivePorts)
+            {
+                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+                {
+
+                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    {
+                        string userName = GetUserName(receiveLocation.TransportTypeData);
+
+                        if (!string.IsNullOrEmpty(userName))
+                        {
+                            Console.WriteLine("receive;{0};{1};{2}", receiveLocation.Name, receiveLocation.Address, userName);
+                        }
+
+                    }
+                }
+
+            }
+
+            foreach (SendPort sendPort in application.SendPorts)
+            {
+
+                string userName;
+
+                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                {
+                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+
+                    if (!string.IsNullOrEmpty(userName))
+                    {
+                        Console.WriteLine("send;{0};{1};{2}", sendPort.Name, sendPort.PrimaryTransport.Address, userName);
+                    }
+                }
+                if (sendPort.SecondaryTransport != null && sendPort.SecondaryTransport.TransportTypeData != null)
+                {
+
+                    userName = GetUserName(sendPort.SecondaryTransport.TransportTypeData);
+
+                    if (!string.IsNullOrEmpty(userName))
+                    {
+                        Console.WriteLine("send;{0};{1};{2}", sendPort.Name, sendPort.SecondaryTransport.Address, userName);
+                    }
+                }
+            }
+
+        }
+
+        private static void GenerateCredentialMapping(string applicationName, string mappingPath)
+        {
+
+            BtsCatalogExplorer catalog = new BtsCatalogExplorer();
+            catalog.ConnectionString = GetConnectionString();
+
+            Application application = catalog.Applications[applicationName];
+
+            CredentialMapping credentialMapping = new CredentialMapping();
+            credentialMapping.Maps = new List<Map>();
+
+            foreach (ReceivePort receivePort in application.ReceivePorts)
+            {
+                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+                {
+
+                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    {
+                        string userName = GetUserName(receiveLocation.TransportTypeData);
+
+                        if (!string.IsNullOrEmpty(userName))
+                        {
+                            string serverUri = GetServerUri(receiveLocation.Address);
+
+                            Map map = new Map { UriStartWith = serverUri, Username = userName };
+
+                            if (!credentialMapping.Maps.Contains<Map>(map))
+                            {
+                                credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName });
+                            }
+                        }
+
+                    }
+                }
+
+            }
+
+            foreach (SendPort sendPort in application.SendPorts)
+            {
+
+                string userName;
+
+                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                {
+                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+
+                    if (!string.IsNullOrEmpty(userName))
+                    {
+                        string serverUri = GetServerUri(sendPort.PrimaryTransport.Address);
+
+                        Map map = new Map { UriStartWith = serverUri, Username = userName };
+
+                        if (!credentialMapping.Maps.Contains<Map>(map))
+                        {
+                            credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName });
+                        }
+                    }
+                }
+               
+            }
+
+            credentialMapping.Maps = credentialMapping.Maps.OrderBy(x => x.UriStartWith).ThenBy(x => x.Username).ToList();
+
+            string fileContent = JsonConvert.SerializeObject(credentialMapping, Newtonsoft.Json.Formatting.Indented);
+
+            if (string.IsNullOrEmpty(mappingPath))
+            {
+                mappingPath = string.Concat("CredentialMapping_", Guid.NewGuid().ToString(), ".json");
+            }
+
+            File.WriteAllText(mappingPath, fileContent);
+
+            Console.WriteLine(string.Format("Generated '{0}' file.", mappingPath));
+
+        }
+
+        private static string GetServerUri(string address)
+        {
+
+            string returnValue;
+
+            Uri uri = new Uri(address);
+
+            if (uri.Scheme == "file")
+            {
+                returnValue = Path.GetDirectoryName(address);
+            }
+            else if (!address.Contains(string.Concat(":", uri.Port)))
+            {
+                returnValue = string.Format("{0}://{1}", uri.Scheme, uri.Host);
+            }
+            else
+            {
+                returnValue = string.Format("{0}://{1}:{2}", uri.Scheme, uri.Host, uri.Port);
+            }
+
+            return returnValue;
+
+        }
+
+        private static void GenerateSetCredentialScript(string applicationName, string scriptFilePath, string mappingFilePath)
+        {
+
+            BtsCatalogExplorer catalog = new BtsCatalogExplorer();
+            catalog.ConnectionString = GetConnectionString();
+            string programPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            StringBuilder scriptContent = new StringBuilder();
+            Application application = catalog.Applications[applicationName];
+            CredentialMapping credentialMapping = null;
+            bool credentialMappingLoaded = false;
+
+            if (File.Exists(mappingFilePath))
+            {
+                try
+                {
+                    string config = File.ReadAllText(mappingFilePath);
+
+                    credentialMapping = JsonConvert.DeserializeObject<CredentialMapping>(config);
+                    credentialMapping.Maps = credentialMapping.Maps.OrderByDescending(x => x.UriStartWith).ThenByDescending(x => x.Username).ToList();
+                    credentialMappingLoaded = true;
+                }
+                catch(Exception exc)
+                {
+                    Console.WriteLine("Error loading mapping file:");
+                    Console.WriteLine("-------------------------------------------------");
+                    Console.WriteLine(exc.Message);
+                    Console.WriteLine("-------------------------------------------------");
+                    Console.WriteLine();
+                }
+
+            }
+
+            scriptContent.AppendLine("REM --------------------------------------");
+            scriptContent.AppendLine("@echo Receive Location:");
+            scriptContent.AppendLine("REM --------------------------------------");
+            scriptContent.AppendLine();
+
+            foreach (ReceivePort receivePort in application.ReceivePorts)
+            {
+                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+                {
+
+                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    {
+                        string userName = GetUserName(receiveLocation.TransportTypeData);
+
+                        if (!string.IsNullOrEmpty(userName))
+                        {
+                            string password = GetPasswordFromMappingFile(credentialMapping, receiveLocation.Address, userName);
+
+                            scriptContent.AppendFormat("\"{0}\" -set -receive -name:{1} -user:{2} -password:{3}\r\n", programPath, receiveLocation.Name, userName, password);
+                        }
+
+                    }
+                }
+
+            }
+
+            scriptContent.AppendLine();
+            scriptContent.AppendLine("REM --------------------------------------");
+            scriptContent.AppendLine("@echo Send Port (Only Primary Transport):");
+            scriptContent.AppendLine("REM --------------------------------------");
+            scriptContent.AppendLine();
+
+            foreach (SendPort sendPort in application.SendPorts)
+            {
+
+                string userName;
+
+                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                {
+                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+
+                    if (!string.IsNullOrEmpty(userName))
+                    {
+                        string password = GetPasswordFromMappingFile(credentialMapping, sendPort.PrimaryTransport.Address, userName);
+
+                        scriptContent.AppendFormat("\"{0}\" -set -send -name:{1} -user:{2} -password:{3}\r\n", programPath, sendPort.Name, userName, password);
+                    }
+                }
+               
+            }
+            
+
+            if (string.IsNullOrEmpty(scriptFilePath))
+            {
+                scriptFilePath = string.Concat("SetPassword_", Guid.NewGuid().ToString(), ".cmd");
+            }
+
+            File.WriteAllText(scriptFilePath, scriptContent.ToString());
+
+            Console.WriteLine(string.Format("Generated '{0}' file.", scriptFilePath));
+
+        }
+
+        private static string GetPasswordFromMappingFile(CredentialMapping credentialMapping, string address, string username)
+        {
+            string returnValue = "######";
+
+            if (credentialMapping != null)
+            {
+                foreach (var map in credentialMapping.Maps)
+                {
+                    if (address.ToLower().StartsWith(map.UriStartWith.ToLower()) && username.ToLower() == map.Username.ToLower() && map.Password != null)
+                    {
+                        returnValue = map.Password;
+                        break;
+                    }
+                }
+            }
+
+            return returnValue;
         }
 
         private static void GetReceiveLocation(string receiveLocationName)
@@ -694,6 +1041,59 @@ namespace Microsys.EAI.Framework.PasswordManager
             adapterConfigString = adapterConfigString.Replace(">", "&gt;");
 
             adapterConfigNode.InnerXml = adapterConfigString;
+        }
+
+        private static string GetUserName(string transportTypeData)
+        {
+
+            string returnValue = string.Empty;
+
+            try
+            {
+
+                if (!transportTypeData.ToLower().Contains("user"))
+                {
+                    return returnValue;
+                }
+
+                XmlDocument transportTypeDataXml = new XmlDocument();
+                transportTypeDataXml.LoadXml(transportTypeData);
+
+                XmlNode userNameNode = transportTypeDataXml.SelectSingleNode("/CustomProps/UserName");
+
+                if (userNameNode != null)
+                {
+                    returnValue = userNameNode.InnerText;
+                }
+                else
+                {
+
+                    XmlNode adapterConfigNode = transportTypeDataXml.SelectSingleNode("/CustomProps/adapterconfig");
+
+                    XmlDocument adapterConfigXml = new XmlDocument();
+                    adapterConfigXml.LoadXml(adapterConfigNode.InnerText);
+
+                    userNameNode = adapterConfigXml.SelectSingleNode("/config/username");
+
+                    if (userNameNode != null)
+                    {
+                        returnValue = userNameNode.InnerText;
+                    }
+                    else
+                    {
+                        userNameNode = adapterConfigXml.SelectSingleNode("/config/user");
+
+                        if (userNameNode != null)
+                        {
+                            returnValue = userNameNode.InnerText;
+                        }
+                    }
+                }
+
+            }
+            catch { }
+
+            return returnValue;
         }
     }
 }
