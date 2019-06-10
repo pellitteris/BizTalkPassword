@@ -454,7 +454,6 @@ namespace Microsys.EAI.Framework.PasswordManager
             StringBuilder scriptContent = new StringBuilder();
             Application application = catalog.Applications[applicationName];
             CredentialMapping credentialMapping = null;
-            bool credentialMappingLoaded = false;
 
             if (File.Exists(mappingFilePath))
             {
@@ -464,7 +463,6 @@ namespace Microsys.EAI.Framework.PasswordManager
 
                     credentialMapping = JsonConvert.DeserializeObject<CredentialMapping>(config);
                     credentialMapping.Maps = credentialMapping.Maps.OrderByDescending(x => x.UriStartWith).ThenByDescending(x => x.Username).ToList();
-                    credentialMappingLoaded = true;
                 }
                 catch(Exception exc)
                 {
