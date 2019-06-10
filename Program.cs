@@ -428,6 +428,10 @@ namespace Microsys.EAI.Framework.PasswordManager
             {
                 returnValue = Path.GetDirectoryName(address);
             }
+            else if (uri.Scheme == "sap")
+            {
+                returnValue = address;
+            }
             else if (!address.Contains(string.Concat(":", uri.Port)))
             {
                 returnValue = string.Format("{0}://{1}", uri.Scheme, uri.Host);
