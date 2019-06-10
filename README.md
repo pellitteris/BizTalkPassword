@@ -12,10 +12,18 @@ Parameters:
 
 -list -application:[application name]
 
--get -receive -name:[receive location name]
+-credentials -application:[application name]
 
+-generatescript -application:[application name] -file:[file name or path] (optional) -mapping:[file name or path] (optional)
+
+-generatemapping -application:[application name] -file:[file name or path] (optional)
+
+-get -receive -name:[receive location name]
 -get -send -name:[send port name]
 
 -set -receive -name:[receive location name] -user:[username] -password:[password]
-
 -set -send -name:[send port name] -user:[username] -password:[password]
+
+-clear -receive -name:[receive location name]
+-clear -send -name:[receive location name]
+
