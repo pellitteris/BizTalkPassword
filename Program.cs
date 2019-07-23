@@ -287,58 +287,66 @@ namespace Microsys.EAI.Framework.PasswordManager
             BtsCatalogExplorer catalog = new BtsCatalogExplorer();
             catalog.ConnectionString = GetConnectionString();
 
-            Application application = catalog.Applications[applicationName];
-
             Console.WriteLine();
-            Console.WriteLine(string.Concat("Application: ", application.Name));
+            Console.WriteLine(string.Concat("Application: ", applicationName));
             Console.WriteLine();
-            Console.WriteLine("Direction;Name;Address;UserName");
+            Console.WriteLine("Direction;Application;Name;Address;UserName;Password");
 
-            foreach (ReceivePort receivePort in application.ReceivePorts)
+            foreach (Application application in catalog.Applications)
             {
-                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+
+                if (application.Name.ToLower().StartsWith(applicationName.ToLower()))
                 {
-
-                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    foreach (ReceivePort receivePort in application.ReceivePorts)
                     {
-                        string userName = GetUserName(receiveLocation.TransportTypeData);
-
-                        if (!string.IsNullOrEmpty(userName))
+                        foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
                         {
-                            Console.WriteLine("receive;{0};{1};{2}", receiveLocation.Name, receiveLocation.Address, userName);
+
+                            if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                            {
+                                string userName = GetUserName(receiveLocation.TransportTypeData);
+                                string userPassword = GetUserPassword(receiveLocation.TransportTypeData);
+
+                                if (!string.IsNullOrEmpty(userName))
+                                {
+                                    Console.WriteLine("receive;{0};{1};{2};{3};{4}", application.Name, receiveLocation.Name, receiveLocation.Address, userName, userPassword);
+                                }
+
+                            }
                         }
 
                     }
-                }
 
-            }
-
-            foreach (SendPort sendPort in application.SendPorts)
-            {
-
-                string userName;
-
-                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
-                {
-                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
-
-                    if (!string.IsNullOrEmpty(userName))
+                    foreach (SendPort sendPort in application.SendPorts)
                     {
-                        Console.WriteLine("send;{0};{1};{2}", sendPort.Name, sendPort.PrimaryTransport.Address, userName);
+
+                        string userName;
+                        string userPassword;
+
+                        if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                        {
+                            userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+                            userPassword = GetUserPassword(sendPort.PrimaryTransport.TransportTypeData);
+
+                            if (!string.IsNullOrEmpty(userName))
+                            {
+                                Console.WriteLine("send;{0};{1};{2};{3};{4}", application.Name, sendPort.Name, sendPort.PrimaryTransport.Address, userName, userPassword);
+                            }
+                        }
+                        if (sendPort.SecondaryTransport != null && sendPort.SecondaryTransport.TransportTypeData != null)
+                        {
+
+                            userName = GetUserName(sendPort.SecondaryTransport.TransportTypeData);
+                            userPassword = GetUserPassword(sendPort.SecondaryTransport.TransportTypeData);
+
+                            if (!string.IsNullOrEmpty(userName))
+                            {
+                                Console.WriteLine("send;{0};{1};{2};{3};{4}", application.Name, sendPort.Name, sendPort.SecondaryTransport.Address, userName, userPassword);
+                            }
+                        }
                     }
                 }
-                if (sendPort.SecondaryTransport != null && sendPort.SecondaryTransport.TransportTypeData != null)
-                {
-
-                    userName = GetUserName(sendPort.SecondaryTransport.TransportTypeData);
-
-                    if (!string.IsNullOrEmpty(userName))
-                    {
-                        Console.WriteLine("send;{0};{1};{2}", sendPort.Name, sendPort.SecondaryTransport.Address, userName);
-                    }
-                }
             }
-
         }
 
         private static void GenerateCredentialMapping(string applicationName, string mappingPath)
@@ -347,59 +355,66 @@ namespace Microsys.EAI.Framework.PasswordManager
             BtsCatalogExplorer catalog = new BtsCatalogExplorer();
             catalog.ConnectionString = GetConnectionString();
 
-            Application application = catalog.Applications[applicationName];
-
+            
             CredentialMapping credentialMapping = new CredentialMapping();
             credentialMapping.Maps = new List<Map>();
 
-            foreach (ReceivePort receivePort in application.ReceivePorts)
+            foreach (Application application in catalog.Applications)
             {
-                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+                if (application.Name.ToLower().StartsWith(applicationName.ToLower()))
                 {
-
-                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    foreach (ReceivePort receivePort in application.ReceivePorts)
                     {
-                        string userName = GetUserName(receiveLocation.TransportTypeData);
-
-                        if (!string.IsNullOrEmpty(userName))
+                        foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
                         {
-                            string serverUri = GetServerUri(receiveLocation.Address);
 
-                            Map map = new Map { UriStartWith = serverUri, Username = userName };
-
-                            if (!credentialMapping.Maps.Contains<Map>(map))
+                            if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
                             {
-                                credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName });
+                                string userName = GetUserName(receiveLocation.TransportTypeData);
+                                string userPassword = GetUserPassword(receiveLocation.TransportTypeData);
+
+                                if (!string.IsNullOrEmpty(userName))
+                                {
+                                    string serverUri = GetServerUri(receiveLocation.Address);
+
+                                    Map map = new Map { UriStartWith = serverUri, Username = userName };
+
+                                    if (!credentialMapping.Maps.Contains<Map>(map))
+                                    {
+                                        credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName, Password = userPassword });
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+
+                    foreach (SendPort sendPort in application.SendPorts)
+                    {
+
+                        string userName;
+                        string userPassword;
+
+                        if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                        {
+                            userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+                            userPassword = GetUserPassword(sendPort.PrimaryTransport.TransportTypeData);
+
+                            if (!string.IsNullOrEmpty(userName))
+                            {
+                                string serverUri = GetServerUri(sendPort.PrimaryTransport.Address);
+
+                                Map map = new Map { UriStartWith = serverUri, Username = userName };
+
+                                if (!credentialMapping.Maps.Contains<Map>(map))
+                                {
+                                    credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName, Password = userPassword });
+                                }
                             }
                         }
 
                     }
                 }
-
-            }
-
-            foreach (SendPort sendPort in application.SendPorts)
-            {
-
-                string userName;
-
-                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
-                {
-                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
-
-                    if (!string.IsNullOrEmpty(userName))
-                    {
-                        string serverUri = GetServerUri(sendPort.PrimaryTransport.Address);
-
-                        Map map = new Map { UriStartWith = serverUri, Username = userName };
-
-                        if (!credentialMapping.Maps.Contains<Map>(map))
-                        {
-                            credentialMapping.Maps.Add(new Map { UriStartWith = serverUri, Username = userName });
-                        }
-                    }
-                }
-               
             }
 
             credentialMapping.Maps = credentialMapping.Maps.OrderBy(x => x.UriStartWith).ThenBy(x => x.Username).ToList();
@@ -452,7 +467,6 @@ namespace Microsys.EAI.Framework.PasswordManager
             catalog.ConnectionString = GetConnectionString();
             string programPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
             StringBuilder scriptContent = new StringBuilder();
-            Application application = catalog.Applications[applicationName];
             CredentialMapping credentialMapping = null;
 
             if (File.Exists(mappingFilePath))
@@ -480,52 +494,62 @@ namespace Microsys.EAI.Framework.PasswordManager
             scriptContent.AppendLine("REM --------------------------------------");
             scriptContent.AppendLine();
 
-            foreach (ReceivePort receivePort in application.ReceivePorts)
+            foreach (Application application in catalog.Applications)
             {
-                foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
+                if (application.Name.ToLower().StartsWith(applicationName.ToLower()))
                 {
-
-                    if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                    foreach (ReceivePort receivePort in application.ReceivePorts)
                     {
-                        string userName = GetUserName(receiveLocation.TransportTypeData);
-
-                        if (!string.IsNullOrEmpty(userName))
+                        foreach (ReceiveLocation receiveLocation in receivePort.ReceiveLocations)
                         {
-                            string password = GetPasswordFromMappingFile(credentialMapping, receiveLocation.Address, userName);
 
-                            scriptContent.AppendFormat("\"{0}\" -set -receive -name:{1} -user:{2} -password:{3}\r\n", programPath, receiveLocation.Name, userName, password);
+                            if (!string.IsNullOrEmpty(receiveLocation.TransportTypeData))
+                            {
+                                string userName = GetUserName(receiveLocation.TransportTypeData);
+
+                                if (!string.IsNullOrEmpty(userName))
+                                {
+                                    string password = GetPasswordFromMappingFile(credentialMapping, receiveLocation.Address, userName);
+
+                                    scriptContent.AppendFormat("\"{0}\" -set -receive -name:{1} -user:{2} -password:{3}\r\n", programPath, receiveLocation.Name, userName, password);
+                                }
+
+                            }
                         }
 
                     }
                 }
-
             }
-
             scriptContent.AppendLine();
             scriptContent.AppendLine("REM --------------------------------------");
             scriptContent.AppendLine("@echo Send Port (Only Primary Transport):");
             scriptContent.AppendLine("REM --------------------------------------");
             scriptContent.AppendLine();
 
-            foreach (SendPort sendPort in application.SendPorts)
+            foreach (Application application in catalog.Applications)
             {
-
-                string userName;
-
-                if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                if (application.Name.ToLower().StartsWith(applicationName.ToLower()))
                 {
-                    userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
-
-                    if (!string.IsNullOrEmpty(userName))
+                    foreach (SendPort sendPort in application.SendPorts)
                     {
-                        string password = GetPasswordFromMappingFile(credentialMapping, sendPort.PrimaryTransport.Address, userName);
 
-                        scriptContent.AppendFormat("\"{0}\" -set -send -name:{1} -user:{2} -password:{3}\r\n", programPath, sendPort.Name, userName, password);
+                        string userName;
+
+                        if (sendPort.PrimaryTransport != null && sendPort.PrimaryTransport.TransportTypeData != null)
+                        {
+                            userName = GetUserName(sendPort.PrimaryTransport.TransportTypeData);
+
+                            if (!string.IsNullOrEmpty(userName))
+                            {
+                                string password = GetPasswordFromMappingFile(credentialMapping, sendPort.PrimaryTransport.Address, userName);
+
+                                scriptContent.AppendFormat("\"{0}\" -set -send -name:{1} -user:{2} -password:{3}\r\n", programPath, sendPort.Name, userName, password);
+                            }
+                        }
+
                     }
                 }
-               
             }
-            
 
             if (string.IsNullOrEmpty(scriptFilePath))
             {
@@ -546,7 +570,7 @@ namespace Microsys.EAI.Framework.PasswordManager
             {
                 foreach (var map in credentialMapping.Maps)
                 {
-                    if (address.ToLower().StartsWith(map.UriStartWith.ToLower()) && username.ToLower() == map.Username.ToLower() && map.Password != null)
+                    if (address.ToLower().StartsWith(map.UriStartWith.ToLower()) && username.ToLower() == map.Username.ToLower() && ! string.IsNullOrEmpty(map.Password) )
                     {
                         returnValue = map.Password;
                         break;
@@ -1053,7 +1077,11 @@ namespace Microsys.EAI.Framework.PasswordManager
             try
             {
 
-                if (!transportTypeData.ToLower().Contains("user"))
+                LogHelper.Write(LogHelper.EntryType.Information, "transportTypeData: " + transportTypeData);
+
+                transportTypeData = transportTypeData.ToLower();
+
+                if (!transportTypeData.Contains("user"))
                 {
                     return returnValue;
                 }
@@ -1061,35 +1089,30 @@ namespace Microsys.EAI.Framework.PasswordManager
                 XmlDocument transportTypeDataXml = new XmlDocument();
                 transportTypeDataXml.LoadXml(transportTypeData);
 
-                XmlNode userNameNode = transportTypeDataXml.SelectSingleNode("/CustomProps/UserName");
+                XmlNode userNameNode = transportTypeDataXml.SelectSingleNode("/customprops/username");
 
                 if (userNameNode != null)
                 {
-                    returnValue = userNameNode.InnerText;
+                    return userNameNode.InnerText;
                 }
-                else
+                               
+                XmlNode adapterConfigNode = transportTypeDataXml.SelectSingleNode("/customprops/adapterconfig");
+
+                XmlDocument adapterConfigXml = new XmlDocument();
+                adapterConfigXml.LoadXml(adapterConfigNode.InnerText);
+
+                userNameNode = adapterConfigXml.SelectSingleNode("/config/username");
+
+                if (userNameNode != null)
                 {
+                    return userNameNode.InnerText;
+                }
 
-                    XmlNode adapterConfigNode = transportTypeDataXml.SelectSingleNode("/CustomProps/adapterconfig");
+                userNameNode = adapterConfigXml.SelectSingleNode("/config/user");
 
-                    XmlDocument adapterConfigXml = new XmlDocument();
-                    adapterConfigXml.LoadXml(adapterConfigNode.InnerText);
-
-                    userNameNode = adapterConfigXml.SelectSingleNode("/config/username");
-
-                    if (userNameNode != null)
-                    {
-                        returnValue = userNameNode.InnerText;
-                    }
-                    else
-                    {
-                        userNameNode = adapterConfigXml.SelectSingleNode("/config/user");
-
-                        if (userNameNode != null)
-                        {
-                            returnValue = userNameNode.InnerText;
-                        }
-                    }
+                if (userNameNode != null)
+                {
+                    return userNameNode.InnerText;
                 }
 
             }
@@ -1097,5 +1120,44 @@ namespace Microsys.EAI.Framework.PasswordManager
 
             return returnValue;
         }
+
+        private static string GetUserPassword(string transportTypeData)
+        {
+
+            string returnValue = string.Empty;
+
+            try
+            {
+
+                LogHelper.Write(LogHelper.EntryType.Information, "transportTypeData: " + transportTypeData);
+
+                transportTypeData = transportTypeData.ToLower();
+
+                if (!transportTypeData.Contains("password"))
+                {
+                    return returnValue;
+                }
+
+                XmlDocument transportTypeDataXml = new XmlDocument();
+                transportTypeDataXml.LoadXml(transportTypeData);
+
+                XmlNode adapterConfigNode = transportTypeDataXml.SelectSingleNode("/customprops/adapterconfig");
+
+                XmlDocument adapterConfigXml = new XmlDocument();
+                adapterConfigXml.LoadXml(adapterConfigNode.InnerText);
+
+                XmlNode userPassword = adapterConfigXml.SelectSingleNode("/config/password");
+
+                if (userPassword != null)
+                {
+                    return userPassword.InnerText;
+                }
+
+            }
+            catch { }
+
+            return returnValue;
+        }
+
     }
 }
