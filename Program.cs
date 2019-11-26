@@ -179,17 +179,17 @@ namespace Microsys.EAI.Framework.PasswordManager
 
                 if (arg.StartsWith("-password:"))
                 {
-                    _password = param.Split(":".ToCharArray())[1];
+                    _password = param.Substring(10, arg.Length - 10);
                 }
 
                 if (arg.StartsWith("-file:"))
                 {
-                    _filePath = param.Split(":".ToCharArray())[1];
+                    _filePath = param.Substring(6, arg.Length - 6);
                 }
 
                 if (arg.StartsWith("-mapping:"))
                 {
-                    _mappingPath = param.Split(":".ToCharArray())[1];
+                    _mappingPath = param.Substring(9, arg.Length - 9);
                 }
             }
 
